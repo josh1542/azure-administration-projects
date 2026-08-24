@@ -1,0 +1,18 @@
+# Generated lifecycle audit logs
+logs/*.csv
+
+# PowerShell local files
+*.log
+
+# Secrets and environment files
+.env
+*.secret
+*.secrets
+
+# Editor files
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
