@@ -66,7 +66,7 @@ Validated Azure VM protection, recovery points, file recovery, VM recovery and m
 
 ## Projects
 
-### [01. Azure Policy, Governance and Resource Protection](projects/01-azure-identity-access-governance/README.md)
+### [01. Azure Policy, Governance and Resource Protection](projects/01-azure-governance-resource-protection/README.md)
 
 Built and validated Azure governance controls using Policy, tagging, Modify remediation with managed identity, management-group hierarchy practice and resource locks.
 
