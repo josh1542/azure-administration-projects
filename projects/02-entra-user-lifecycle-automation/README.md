@@ -2,13 +2,15 @@
 
 ## Overview
 
-I built a PowerShell and Microsoft Graph workflow to automate common Microsoft Entra ID onboarding and offboarding tasks.
+Built a PowerShell and Microsoft Graph workflow to automate Microsoft Entra ID onboarding and offboarding.
 
-The project covers user creation, identity attributes, temporary-password generation, security-group assignment, account disabling, sign-in session revocation, direct group removal, direct licence-removal logic, final-state validation and lifecycle audit logging.
+The workflow covers user creation, profile configuration, security-group assignment, temporary-password handling, account disabling, sign-in session revocation, direct group removal, licence handling and audit logging.
 
-The workflow was developed against a Microsoft Entra ID lab tenant using PowerShell 7 and the Microsoft Graph PowerShell SDK.
+The project also includes a separate local Python and Ollama agent for onboarding and offboarding requests. The agent operates in dry-run mode with identity validation and administrator approval controls.
 
 ## Architecture
+
+### Lifecycle Automation
 
 ```text
 Administrator
@@ -21,20 +23,34 @@ Microsoft Graph
      |
      v
 Microsoft Entra ID
-     |
-     +-- User Accounts
-     +-- Security Groups
-     +-- Licence Assignments
-     +-- Sign-in Sessions
-     +-- Account Status
 ```
 
-Authentication uses a dedicated Microsoft Entra app registration with delegated Microsoft Graph permissions.
+### Agent Request Layer
+
+```text
+Onboarding / offboarding request
+        |
+        v
+Python + Ollama
+        |
+        v
+Identity validation
+        |
+        v
+Administrator approval
+        |
+        v
+Simulated lifecycle action
+```
 
 ## Repository Structure
 
 ```text
 02-entra-user-lifecycle-automation/
+├── agent/
+│   └── agent.py
+├── data/
+│   └── sample-users.json
 ├── scripts/
 │   ├── Common.ps1
 │   ├── New-User.ps1
@@ -43,293 +59,89 @@ Authentication uses a dedicated Microsoft Entra app registration with delegated 
 │   ├── automated-user-validation.png
 │   ├── automated-group-membership.png
 │   ├── automated-offboarding-validation.png
-│   └── lifecycle-audit-trail.png
-├── logs/
-│   └── lifecycle-audit.csv
+│   ├── lifecycle-audit-trail.png
+│   ├── agent-offboarding-request.png
+│   └── agent-safety-controls.png
 ├── .gitignore
 └── README.md
 ```
 
-Generated lifecycle audit CSV files are excluded from version control.
+Generated audit logs, Python virtual environments and cache files are excluded from source control.
 
-## Microsoft Graph Authentication
+## Lifecycle Automation
 
-A dedicated Microsoft Entra app registration was created for the automation:
+### Onboarding
 
-```text
-Entra User Lifecycle Automation
-```
+`scripts/New-User.ps1`:
 
-The workflow requests the following delegated Microsoft Graph permissions:
+- Validates the Microsoft Graph session
+- Checks for an existing UPN
+- Validates target security groups
+- Generates a temporary password
+- Creates the user
+- Requires password change at first sign-in
+- Assigns security groups
+- Writes audit events
 
-```text
-User.Read.All
-User.ReadWrite.All
-User.EnableDisableAccount.All
-GroupMember.ReadWrite.All
-LicenseAssignment.ReadWrite.All
-```
+### Offboarding
 
-Administrator consent was granted for the tenant-wide delegated permissions required by the workflow.
+`scripts/Offboard-User.ps1`:
 
-The helper function in `Common.ps1` establishes the Graph session with the application's client ID and tenant ID:
+- Locates the user
+- Disables the account
+- Revokes sign-in sessions
+- Removes direct group memberships
+- Checks and removes directly assigned licences when applicable
+- Validates the final account state
+- Writes audit events
 
-```powershell
-. .\scripts\Common.ps1
-
-Connect-UserLifecycleGraph `
-    -ClientId "<application-client-id>" `
-    -TenantId "<tenant-id>"
-```
-
-The onboarding and offboarding scripts require this Graph session to exist before they run.
-
-No client secrets, access tokens or passwords are stored in the repository.
-
-## User Onboarding
-
-`scripts/New-User.ps1` automates user provisioning and initial account configuration.
-
-The workflow performs:
-
-```text
-Validate Graph session
-    |
-    v
-Check for existing UPN
-    |
-    v
-Validate target groups
-    |
-    v
-Generate temporary password
-    |
-    v
-Create user
-    |
-    v
-Require password change
-    |
-    v
-Assign security groups
-    |
-    v
-Write audit events
-    |
-    v
-Return onboarding result
-```
-
-The script supports:
-
-- First name
-- Last name
-- User principal name
-- Display name
-- Job title
-- Department
-- Usage location
-- Security group membership
-
-Example:
-
-```powershell
-$Result = .\scripts\New-User.ps1 `
-    -FirstName "Emily" `
-    -LastName "Carter" `
-    -UserPrincipalName "emily.carter@contoso.onmicrosoft.com" `
-    -JobTitle "IT Support Analyst" `
-    -Department "Information Technology" `
-    -GroupNames @(
-        "SG-All-Employees",
-        "SG-IT-Support"
-    )
-```
-
-The temporary password is generated at runtime, the account is configured to require a password change at first sign-in, and the generated password is returned in the result object:
-
-```powershell
-$Result.TemporaryPassword
-```
-
-The temporary password is not written to the lifecycle audit log and should be handled through an appropriate secure handover process.
-
-Target groups are validated before user creation so a missing or duplicate group name does not leave a newly created account in a partially configured onboarding state.
-
-The completed lab validation used:
-
-```text
-SG-All-Employees
-SG-IT-Support
-```
-
-## User Offboarding
-
-`scripts/Offboard-User.ps1` automates access removal when a user leaves the organisation.
-
-The workflow performs:
-
-```text
-Locate user
-    |
-    v
-Disable account
-    |
-    v
-Revoke sign-in sessions
-    |
-    v
-Remove direct group memberships
-    |
-    v
-Check direct licence assignments
-    |
-    v
-Remove licences when applicable
-    |
-    v
-Validate final account state
-    |
-    v
-Write audit events
-```
-
-Example:
-
-```powershell
-.\scripts\Offboard-User.ps1 `
-    -UserPrincipalName "emily.carter@contoso.onmicrosoft.com"
-```
-
-The existing lab evidence confirms:
+The original lab validation confirmed:
 
 ```text
 AccountEnabled = False
 RemainingGroups = 0
 ```
 
-Dynamic group memberships are skipped because they are controlled by Microsoft Entra membership rules rather than direct assignment.
+Dynamic group memberships are skipped because they are controlled by Microsoft Entra membership rules.
 
-The hardened offboarding script also calls `Revoke-MgUserSignInSession` after disabling the account so existing sign-in sessions are invalidated. This code hardening was added after the original screenshot validation, so the published screenshots should not be treated as evidence for that specific step.
+The lab tenant did not contain an assignable subscribed licence SKU, so the live validation covered the no-licence path.
 
-## Security Group Automation
+## Agent-Assisted Requests
 
-The onboarding workflow assigns users to predefined Entra security groups.
+`agent/agent.py` provides a local interface for onboarding and offboarding requests using test identities from `data/sample-users.json`.
 
-The project was tested with:
+The agent requires administrator approval for onboarding and offboarding and includes checks for:
 
-```text
-SG-All-Employees
-SG-IT-Support
-```
+- Existing or unknown users
+- Duplicate onboarding requests
+- Missing onboarding attributes
+- Ambiguous offboarding requests
+- Unsupported permanent account deletion
 
-Before account creation, each requested group is checked for:
+For offboarding, the selected identity must exist in the local test data and must be explicitly identified in the original request.
 
-- Missing groups
-- Duplicate display names
+During testing, an ambiguous offboarding request caused the model to infer an account that had not been supplied. I added code-level identity validation so the target must exist in the local test data and match the identity provided in the request before administrator approval can be presented.
 
-After account creation, assignment logic checks for:
+The agent remains dry-run only and does not execute the PowerShell scripts or make live Microsoft Entra ID changes.
 
-- Existing membership
-- Successful assignment
+## Security and Validation
 
-During offboarding, direct non-dynamic group memberships are removed automatically.
-
-## Licence Handling
-
-The offboarding workflow checks the user's directly assigned licences.
-
-If directly assigned licences are present, the script removes them through Microsoft Graph.
-
-The lab tenant used for this project did not contain an assignable subscribed licence SKU, so the licence-removal branch could not be exercised against a live assigned licence.
-
-The no-licence path was validated and records:
-
-```text
-LicenseRemoval
-Skipped
-No directly assigned licences found
-```
-
-No simulated licence assignment was used.
-
-## Audit Logging
-
-Lifecycle operations are recorded in:
-
-```text
-logs/lifecycle-audit.csv
-```
-
-Each audit record contains:
-
-```text
-Timestamp
-Action
-UserPrincipalName
-Status
-Details
-```
-
-Lifecycle events include:
-
-```text
-UserCreated
-GroupAssignment
-UserDisabled
-SessionRevocation
-GroupRemoval
-LicenseRemoval
-OffboardingCompleted
-```
-
-Generated CSV audit files are excluded from source control through `.gitignore`.
-
-Temporary passwords are never written to the audit log.
-
-## Error Handling and Validation
-
-The scripts include checks for:
-
-- Missing Microsoft Graph authentication context
-- Existing users with the same UPN
-- Missing security groups
-- Duplicate group display names
-- Existing group membership
-- Dynamic security groups
-- Direct licence assignments
-- Sign-in session revocation
-- Final account status
-- Remaining direct group memberships
-
-Failures are surfaced through PowerShell errors and relevant lifecycle failures are written to the audit log.
-
-## Security and Repository Practices
-
-- Dedicated Microsoft Entra app registration
-- Delegated Microsoft Graph permissions scoped to the implemented operations
-- Administrator consent for privileged delegated permissions
-- No client secrets committed to Git
-- No access tokens stored in source files
-- Runtime temporary-password generation
-- Password change required at first sign-in
+- Dedicated Microsoft Entra app registration with delegated Microsoft Graph permissions
+- Graph permissions include `User.Read.All`, `User.ReadWrite.All`, `User.EnableDisableAccount.All`, `GroupMember.ReadWrite.All` and `LicenseAssignment.ReadWrite.All`
+- No client secrets, access tokens or passwords stored in the repository
 - Temporary passwords excluded from audit logs
-- Graph-session validation before lifecycle operations
 - Target-group validation before user creation
 - Sign-in session revocation during offboarding
+- Administrator approval for agent-assisted requests
+- Code-level identity validation before offboarding approval
+- Audit records include timestamp, action, user principal name, status and details
 - Generated audit logs excluded from version control
-- Dynamic-group protection
-- Final account-state validation
-
-Tenant IDs, application client IDs and authentication material are not published in repository documentation or screenshots.
 
 ## Evidence
 
 ### Automated User Validation
 
 The provisioned Entra user was validated through Microsoft Graph after creation.
-
-The validation confirmed identity attributes including display name, user principal name, job title, department, usage location and enabled account state.
 
 ![Automated user validation](screenshots/automated-user-validation.png)
 
@@ -341,52 +153,39 @@ Microsoft Graph automation successfully assigned the user to the required Entra 
 
 ### Automated Offboarding Validation
 
-The original offboarding validation confirmed that the user account was disabled and direct security-group memberships were removed.
-
-```text
-AccountEnabled = False
-RemainingGroups = 0
-```
+The offboarding validation confirmed that the account was disabled and direct group memberships were removed.
 
 ![Automated offboarding validation](screenshots/automated-offboarding-validation.png)
 
 ### End-to-End Lifecycle Audit Trail
 
-The audit trail records the original validated lifecycle from account creation through group assignment and offboarding.
+The audit trail records the validated lifecycle from account creation through group assignment and offboarding.
 
 ![Lifecycle audit trail](screenshots/lifecycle-audit-trail.png)
 
-## Technologies Used
+### Agent Offboarding Request
+
+The agent resolved an offboarding request to the correct test identity, required administrator approval and completed the action in dry-run mode.
+
+![Agent offboarding request](screenshots/agent-offboarding-request.png)
+
+### Agent Safety Controls
+
+The agent rejected permanent deletion and ambiguous offboarding requests without a specific identity.
+
+![Agent safety controls](screenshots/agent-safety-controls.png)
+
+## Technologies
 
 - Microsoft Entra ID
 - Microsoft Graph
 - Microsoft Graph PowerShell SDK
 - PowerShell 7
-- Microsoft Entra App Registrations
-- Microsoft Entra Security Groups
+- Python
+- Ollama
 - Git
 - GitHub
 
-## Key Skills
-
-- Identity lifecycle automation
-- Microsoft Graph administration
-- PowerShell scripting
-- Microsoft Entra ID administration
-- User onboarding and offboarding
-- Security group automation
-- Microsoft Graph delegated permissions
-- Administrative consent management
-- Sign-in session revocation
-- Audit logging
-- Error handling and validation
-- Secure credential handling
-- Operational documentation
-
 ## Result
 
-Built a reusable PowerShell and Microsoft Graph workflow for Microsoft Entra user onboarding and offboarding.
-
-The original lab validation proved user creation, identity configuration, security-group assignment, account disabling, direct group removal, final-state validation and audit logging. The code was subsequently hardened with pre-creation group validation, explicit Graph-context validation, temporary-password handover and sign-in session revocation.
-
-Direct licence-removal logic is implemented, while the live lab validated the no-licence path because an assignable licence SKU was not available.
+Built and validated a reusable Microsoft Entra ID onboarding and offboarding workflow using PowerShell and Microsoft Graph, with separate dry-run agent controls for request validation and administrator approval.

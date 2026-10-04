@@ -16,3 +16,8 @@ logs/*.csv
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Python agent environment
+.venv/
+__pycache__/
+*.pyc

@@ -76,7 +76,9 @@ The project includes deliberate non-compliance testing, successful policy enforc
 
 Built a PowerShell and Microsoft Graph workflow for Microsoft Entra user onboarding and offboarding.
 
-The workflow covers user creation, profile configuration, temporary-password generation, security-group assignment, account disabling, sign-in session revocation, direct group removal, direct licence-removal logic, final-state validation and lifecycle audit logging.
+The workflow covers user creation, profile configuration, temporary-password generation, security-group assignment, account disabling, sign-in session revocation, direct group removal, licence handling, final-state validation and audit logging.
+
+A separate local Python and Ollama agent provides a dry-run interface for onboarding and offboarding requests, with identity validation and administrator approval controls.
 
 ## Implementation Approach
 
@@ -122,6 +124,8 @@ The portfolio uses:
 - Azure CLI
 - PowerShell
 - Microsoft Graph
+- Python
+- Ollama
 - GitHub Actions
 
 Terraform is used where it adds practical value, while portal-based builds are retained where live validation or comparison is useful.
@@ -144,14 +148,3 @@ Sensitive or environment-specific information is excluded where appropriate, inc
 - Terraform state and plan files
 
 Temporary Azure resources are removed after validation where practical to control cloud costs.
-
-## Technologies
-
-`Microsoft Azure` · `Microsoft Entra ID` · `Microsoft Graph` · `Azure RBAC` · `Azure Policy` · `Azure Storage` · `Azure Files` · `Azure Virtual Networks` · `Azure VPN Gateway` · `Azure Private DNS` · `Network Security Groups` · `Application Security Groups` · `Azure Virtual Machines` · `VM Scale Sets` · `Azure Load Balancer` · `Azure Application Gateway` · `Azure Monitor` · `Log Analytics` · `KQL` · `Azure Backup` · `Azure App Service` · `Azure Container Registry` · `Azure Container Instances` · `Azure Container Apps` · `Managed Identities` · `ARM Templates` · `Bicep` · `Terraform` · `Azure CLI` · `PowerShell` · `GitHub Actions`
-
-## Current Status
-
-- **14 focused Azure labs completed**
-- **2 portfolio projects completed**
-- Terraform included where appropriate
-- Hands-on validation and evidence maintained alongside each lab and project

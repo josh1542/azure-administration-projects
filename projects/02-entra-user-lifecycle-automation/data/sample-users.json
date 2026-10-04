@@ -1,0 +1,14 @@
+[
+  {
+    "displayName": "Emily Carter",
+    "userPrincipalName": "emily.carter@contoso.onmicrosoft.com",
+    "department": "Information Technology",
+    "accountEnabled": true
+  },
+  {
+    "displayName": "Daniel Wong",
+    "userPrincipalName": "daniel.wong@contoso.onmicrosoft.com",
+    "department": "Finance",
+    "accountEnabled": true
+  }
+]
